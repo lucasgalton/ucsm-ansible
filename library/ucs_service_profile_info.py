@@ -12,10 +12,10 @@ ANSIBLE_METADATA = {'metadata_version': '1.1',
 
 DOCUMENTATION = r'''
 ---
-module: ucs_service_profile_template
-short_description: Configures Service Profile Templates on Cisco UCS Manager
+module: ucs_service_profile_info
+short_description: Returns facts about the service profiles in UCS
 description:
-- Configures Service Profile Templates on Cisco UCS Manager.
+- Returns facts about the service profiles in UCS.
 - Examples can be used with the UCS Platform Emulator U(https://communities.cisco.com/ucspe).
 extends_documentation_fragment: ucs
 options:
