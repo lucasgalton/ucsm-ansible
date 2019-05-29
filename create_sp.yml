@@ -16,6 +16,7 @@
       loop: "{{ wanted_nodes|flatten(levels=1) }}"
       loop_control:
         label: "{{ item.name }}"
+    rhs_os: {}
 
   tasks:
     - name: Get architecture x86_64 id
@@ -42,10 +43,21 @@
       register: rhs_os_response
       <<: *loop_wanted_node
 
-    - name: Check and set operating systems IDs
+    - name: Set operating systems IDs
+      set_fact:
+        rhs_os: "{{ rhs_os | combine({item.item.name : item.json.results[0].id}) }}"
+      loop: "{{ rhs_os_response.results|flatten(levels=1) }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+
+    - name: Debug
+      debug:
+        var: rhs_os
+
+    - name: Check operating systems IDs
       assert:
         that:
-          - rhs_os_response.results.[item.name].json.results[0]['title']==item.os
+          - rhs_os[item.name] > 0
       <<: *loop_wanted_node
 
     - name: Create service profile from template
