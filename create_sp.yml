@@ -1,0 +1,65 @@
+---
+# Example Playbook: VLAN configuration using the [ucs] hosts group
+- hosts: ucs
+  connection: local
+  vars:
+    uri_rhs: &uri_rhs
+      user: "{{ rhs.username }}"
+      password: "{{ rhs.password }}"
+      validate_certs: no
+      force_basic_auth: yes
+    ucs_credentials: &ucs_credentials
+      hostname: "{{ inventory_hostname }}"
+      username: "{{ username | default(omit) }}"
+      password: "{{ password }}"
+    loop_wanted_node: &loop_wanted_node
+      loop: "{{ wanted_nodes|flatten(levels=1) }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+  tasks:
+    - name: Get architecture x86_64 id
+      uri:
+        <<: *uri_rhs
+        url: "{{ rhs.url }}/api/architectures?search=x86_64&page=1&per_page=1"
+        method: GET
+      register: json_response
+
+    - name: Check and set architecture id
+      assert:
+        that:
+          - json_response.json.results[0]['name']=="x86_64"
+        fail_msg: "Architecture x84_64 not found in RHS"
+        success_msg: "Found architecture x86_64 in RHS"
+      vars:
+        rhs_x64_arch_id: "{{ json_response.json.results[0]['id'] }}"
+
+    - name: Get Operating systems from RHS
+      uri:
+        <<: *uri_rhs
+        method: GET
+        url: "{{ rhs.url }}/api/operatingsystems?architecture_id=1&search={{ item.os|urlencode() }}"
+      register: rhs_os_response
+      <<: *loop_wanted_node
+
+    - name: Check and set operating systems IDs
+      assert:
+        that:
+          - rhs_os_response.results.[item.name].json.results[0]['title']==item.os
+      <<: *loop_wanted_node
+
+    - name: Create service profile from template
+      ucs_service_profile_from_template:
+        <<: *ucs_credentials
+        name: "{{ item.name }}"
+        source_template: ceph-node
+      <<: *loop_wanted_node
+
+    - name: Gather facts about services profiles
+      ucs_service_profile_info:
+        <<: *ucs_credentials
+
+    - name: Create host in RHS
+      debug:
+        msg: "{{ ansible_facts['ucs_sp'][item.name]['dn'] }}"
+      <<: *loop_wanted_node

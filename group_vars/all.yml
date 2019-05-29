@@ -1,0 +1,16 @@
+rhs:
+    url: https://10.64.155.171 
+    username: admin
+    password: eLMNPHHvjBHWTiTQ
+wanted_nodes:
+  - name: ans-ceph1
+    network:
+        - name: CEPH_DATA
+          ip: 10.0.0.1
+    os: "RedHat 7.6" 
+  - name: ans-ceph2
+    network:
+        - name: CEPH_DATA
+          ip: 10.0.0.1
+    os: "RedHat 7.6" 
+   
