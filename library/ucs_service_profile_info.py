@@ -55,8 +55,8 @@ def main():
 
     for server_profile in serverProfiles:
         spDict[server_profile.name] = server_profile.__json__()
-        vnic_filter = '(dn, "^' + server_profile.dn + '")'
-        vnics = ucs.login_handle.query_classid(class_id="VnicEther")
+        sp_dn_filter = '(dn, "^' + server_profile.dn + '/")'
+        vnics = ucs.login_handle.query_classid(class_id="VnicEther", filter_str=sp_dn_filter)
         vnicDict = dict()
         for vnic in vnics:
             vnicDict[vnic.name] = vnic.__json__()
@@ -64,7 +64,7 @@ def main():
 
 
     ucs.result['changed'] = False
-    ucs.result['ansible_facts'] = spDict
+    ucs.result['ansible_facts'] = dict(ucs_sp=spDict)
 
     module.exit_json(**ucs.result)
 

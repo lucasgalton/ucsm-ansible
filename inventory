@@ -1,6 +1,7 @@
 [ucs]
-172.16.143.175
+10.64.155.3
 
 [ucs:vars]
 username=admin
-password=password
+password=SoClaude19*
+
