@@ -2,15 +2,25 @@ rhs:
     url: https://10.64.155.171 
     username: admin
     password: eLMNPHHvjBHWTiTQ
+
 wanted_nodes:
-  - name: ans-ceph1
-    network:
-        - name: CEPH_DATA
-          ip: 10.0.0.1
+  - name: ceph-osd-5
+    nics:
+      - identifier: eth0
+        ucs_name: TOOLS_PROV_PRIV
+        rhs_subnet: provisioning
+        rhs_attributes:
+          primary: true
+          ip: 100.70.1.23
+      - identifier: eth1
+        ucs_name: CEPH_DATA
+        rhs_subnet: CEPH_DATA
+      - identifier: eth2
+        ucs_name: CEPH_INFRA
+        rhs_subnet: tools2
     os: "RedHat 7.6" 
-  - name: ans-ceph2
-    network:
-        - name: CEPH_DATA
-          ip: 10.0.0.1
-    os: "RedHat 7.6" 
-   
+    hostgroup: ceph
+    location: Default Location
+    organization: Enedis
+    environment: production
+

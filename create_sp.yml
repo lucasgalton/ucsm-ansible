@@ -16,50 +16,13 @@
       loop: "{{ wanted_nodes|flatten(levels=1) }}"
       loop_control:
         label: "{{ item.name }}"
-    rhs_os: {}
+    rhs_hostgroup: {}
+    rhs_subnet: {}
+    rhs_location: {}
+    rhs_organization: {}
+    rhs_environment: {}
 
   tasks:
-    - name: Get architecture x86_64 id
-      uri:
-        <<: *uri_rhs
-        url: "{{ rhs.url }}/api/architectures?search=x86_64&page=1&per_page=1"
-        method: GET
-      register: json_response
-
-    - name: Check and set architecture id
-      assert:
-        that:
-          - json_response.json.results[0]['name']=="x86_64"
-        fail_msg: "Architecture x84_64 not found in RHS"
-        success_msg: "Found architecture x86_64 in RHS"
-      vars:
-        rhs_x64_arch_id: "{{ json_response.json.results[0]['id'] }}"
-
-    - name: Get Operating systems from RHS
-      uri:
-        <<: *uri_rhs
-        method: GET
-        url: "{{ rhs.url }}/api/operatingsystems?architecture_id=1&search={{ item.os|urlencode() }}"
-      register: rhs_os_response
-      <<: *loop_wanted_node
-
-    - name: Set operating systems IDs
-      set_fact:
-        rhs_os: "{{ rhs_os | combine({item.item.name : item.json.results[0].id}) }}"
-      loop: "{{ rhs_os_response.results|flatten(levels=1) }}"
-      loop_control:
-        label: "{{ item.item.name }}"
-
-    - name: Debug
-      debug:
-        var: rhs_os
-
-    - name: Check operating systems IDs
-      assert:
-        that:
-          - rhs_os[item.name] > 0
-      <<: *loop_wanted_node
-
     - name: Create service profile from template
       ucs_service_profile_from_template:
         <<: *ucs_credentials
@@ -71,7 +34,109 @@
       ucs_service_profile_info:
         <<: *ucs_credentials
 
-    - name: Create host in RHS
-      debug:
-        msg: "{{ ansible_facts['ucs_sp'][item.name]['dn'] }}"
+    - name: Get host groups
+      uri:
+        <<: *uri_rhs
+        method: GET
+        url: "{{ rhs.url }}/api/hostgroups?search=name%3D%22{{ item.hostgroup|urlencode() }}%22"
+      register: rhs_hostgroups_response
       <<: *loop_wanted_node
+
+    - name: Save host groups IDs
+      set_fact:
+        rhs_hostgroup: "{{ rhs_hostgroup | combine({item.item.name : item.json.results[0].id}) }}"
+      loop: "{{ rhs_hostgroups_response.results|flatten(levels=1) }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+
+    - name: Get location ID
+      uri:
+        <<: *uri_rhs
+        method: GET
+        url: "{{ rhs.url }}/api/locations?search=name%3D%22{{ item.location|urlencode() }}%22"
+      register: rhs_locations_response
+      <<: *loop_wanted_node
+
+    - name: Save location id
+      set_fact:
+        rhs_location: "{{ rhs_location | combine({item.item.name : item.json.results[0].id}) }}"
+      loop: "{{ rhs_locations_response.results|flatten(levels=1) }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+
+    - name: Get organization ID
+      uri:
+        <<: *uri_rhs
+        method: GET
+        url: "{{ rhs.url }}/api/organizations?search=name%3D%22{{ item.organization|urlencode() }}%22"
+      register: rhs_organizations_response
+      <<: *loop_wanted_node
+
+    - name: Save organization id
+      set_fact:
+        rhs_organization: "{{ rhs_organization | combine({item.item.name : item.json.results[0].id}) }}"
+      loop: "{{ rhs_organizations_response.results|flatten(levels=1) }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+
+    - name: Get environment ID
+      uri:
+        <<: *uri_rhs
+        method: GET
+        url: "{{ rhs.url }}/api/environments?search=name%3D%22{{ item.environment|urlencode() }}%22"
+      register: rhs_environments_response
+      <<: *loop_wanted_node
+
+    - name: Save environment id
+      set_fact:
+        rhs_environment: "{{ rhs_environment | combine({item.item.name : item.json.results[0].id}) }}"
+      loop: "{{ rhs_environments_response.results|flatten(levels=1) }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+
+    - name: Get subnet IDs
+      uri:
+        <<: *uri_rhs
+        method: GET
+        url: "{{ rhs.url }}/api/subnets?search=name%3D%22{{ item.1.rhs_subnet|urlencode() }}%22"
+      register: rhs_subnets_response
+      loop: "{{ wanted_nodes | subelements('nics') }}"
+      loop_control:
+        label: "{{ item.0.name }}"
+
+    - name: Save subnet id
+      set_fact:
+        rhs_subnet: "{{ rhs_subnet | combine({item.json.results[0].name : item.json.results[0].id}) }}"
+      loop: "{{ rhs_subnets_response.results }}"
+      loop_control:
+        label: "{{ item.json.results[0].name }}"
+
+    - name: Create NICs json
+      vars:
+        flat_json_var_name: "{{ item.0.name + '_' + item.1.identifier }}"
+        hash: "vnic{{ flat_json_var_name | hash('md5') }}"
+        base_attributes: "{{ item.1.rhs_attributes | default({}) }}"
+        subnet: "{{ {'subnet_id' : rhs_subnet[ item.1.rhs_subnet ]} }}"
+        mac: "{{ {'mac' : ucs_sp[ item.0.name ].vnics[item.1.ucs_name].addr } }}"
+        rhs_attributes: "{{ base_attributes | combine(subnet, mac) }}"
+      set_fact:
+        "{{ hash }}": "{{ rhs_attributes }}"
+      loop: "{{ wanted_nodes | subelements('nics') }}"
+
+    - name: Debug
+      vars:
+        flat_json_var_name: "{{ item.0.name + '_' + item.1.identifier }}"
+        hash: "vnic{{ flat_json_var_name | hash('md5') }}"
+      debug:
+        var: "{{ hash }}"
+      loop: "{{ wanted_nodes | subelements('nics') }}"
+
+    - name: Debug
+      debug:
+        var: ucs_sp['ceph-osd-1'].vnics['TOOLS_PROV_PRIV']
+
+#    - name: Create host in RHS
+#      uri:
+#        <<: *uri_rhs
+#        method: POST
+#      <<: *loop_wanted_node

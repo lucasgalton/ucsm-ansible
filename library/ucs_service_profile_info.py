@@ -49,11 +49,11 @@ def main():
     )
     ucs = UCSModule(module)
 
-    serverProfiles = ucs.login_handle.query_classid("LsServer")
+    server_profiles = ucs.login_handle.query_classid("LsServer")
 
     spDict = dict()
 
-    for server_profile in serverProfiles:
+    for server_profile in server_profiles:
         spDict[server_profile.name] = server_profile.__json__()
         sp_dn_filter = '(dn, "^' + server_profile.dn + '/")'
         vnics = ucs.login_handle.query_classid(class_id="VnicEther", filter_str=sp_dn_filter)
