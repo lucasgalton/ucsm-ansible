@@ -18,12 +18,29 @@
         label: "{{ item.name }}"
 
   tasks:
+    - name: Get existing RHS hosts
+      uri:
+        <<: *uri_rhs
+        method: GET
+        url: "{{ rhs.url }}/api/hosts?search=name%3D%22{{ ( item.name + '.' + item.domain ) | urlencode() }}%22"
+      register: rhs_hosts_response
+      <<: *loop_wanted_node
+
+    - name: Check if given host already exists
+      vars:
+        hash: "{{ item.item.name | hash('md5') }}"
+      set_fact:
+        rhs_hosts: "{{ ( rhs_hosts | default([]) ) + [ item.item.name ] }}"
+      loop: "{{ rhs_hosts_response.results }}"
+      when: item.json.results | length == 1
+
     - name: Create service profile from template
       ucs_service_profile_from_template:
         <<: *ucs_credentials
         name: "{{ item.name }}"
         source_template: ceph-node
       <<: *loop_wanted_node
+      when: item.name not in rhs_hosts
 
     - name: Gather facts about services profiles
       ucs_service_profile_info:
@@ -36,6 +53,7 @@
         url: "{{ rhs.url }}/api/hostgroups?search=name%3D%22{{ item.hostgroup|urlencode() }}%22"
       register: rhs_hostgroups_response
       <<: *loop_wanted_node
+      when: item.name not in rhs_hosts
 
     - name: Save host groups IDs
       vars:
@@ -45,6 +63,7 @@
       loop: "{{ rhs_hostgroups_response.results|flatten(levels=1) }}"
       loop_control:
         label: "{{ item.item.name }}"
+      when: rhs_hostgroups_response.results | length > 0
 
     - name: Get location ID
       uri:
@@ -53,6 +72,7 @@
         url: "{{ rhs.url }}/api/locations?search=name%3D%22{{ item.location|urlencode() }}%22"
       register: rhs_locations_response
       <<: *loop_wanted_node
+      when: item.name not in rhs_hosts
 
     - name: Save location id
       vars:
@@ -62,6 +82,7 @@
       loop: "{{ rhs_locations_response.results|flatten(levels=1) }}"
       loop_control:
         label: "{{ item.item.name }}"
+      when: rhs_locations_ is defined
 
     - name: Get organization ID
       uri:
@@ -70,6 +91,7 @@
         url: "{{ rhs.url }}/api/organizations?search=name%3D%22{{ item.organization|urlencode() }}%22"
       register: rhs_organizations_response
       <<: *loop_wanted_node
+      when: item.name not in rhs_hosts
 
     - name: Save organization id
       vars:
@@ -87,6 +109,7 @@
         url: "{{ rhs.url }}/api/environments?search=name%3D%22{{ item.environment|urlencode() }}%22"
       register: rhs_environments_response
       <<: *loop_wanted_node
+      when: item.name not in rhs_hosts
 
     - name: Save environment id
       vars:
@@ -106,15 +129,15 @@
       loop: "{{ wanted_nodes | subelements('nics') }}"
       loop_control:
         label: "{{ item.0.name }}"
+      when: item.0.name not in rhs_hosts and item.1.rhs_subnet is defined
 
     - name: Save subnet id
       set_fact:
         rhs_subnet: "{{ rhs_subnet | default({}) | combine({item.json.results[0].name : item.json.results[0].id}) }}"
       loop: "{{ rhs_subnets_response.results }}"
-      loop_control:
-        label: "{{ item.json.results[0].name }}"
+      when: item.json is defined
 
-    - name: Create NICs json for non vlans NICs
+    - name: Create NICs json for non vlans NICs with subnet
       vars:
         hash: "vnic{{ item.0.name | hash('md5') }}"
         identifier: "{{ { 'identifier' : item.1.identifier } }}"
@@ -127,7 +150,21 @@
       loop: "{{ wanted_nodes | subelements('nics') }}"
       loop_control:
         label: "{{ item.0.name }} - {{ item.1.identifier }}"
-      when: item.1.ucs_name is defined
+      when: item.0.name not in rhs_hosts and item.1.ucs_name is defined and item.1.rhs_subnet is defined
+
+    - name: Create NICs json for non vlans NICs without subnet
+      vars:
+        hash: "vnic{{ item.0.name | hash('md5') }}"
+        identifier: "{{ { 'identifier' : item.1.identifier } }}"
+        base_attributes: "{{ item.1.rhs_attributes | default({}) }}"
+        mac: "{{ { 'mac' : ucs_sp[ item.0.name ].vnics[item.1.ucs_name].addr } }}"
+        rhs_attributes: "{{ base_attributes | combine(identifier, mac) }}"
+      set_fact:
+        "{{ hash }}": "{{ lookup('vars', hash, default=[]) + [ rhs_attributes ] }}"
+      loop: "{{ wanted_nodes | subelements('nics') }}"
+      loop_control:
+        label: "{{ item.0.name }} - {{ item.1.identifier }}"
+      when: item.0.name not in rhs_hosts and item.1.ucs_name is defined and item.1.rhs_subnet is undefined
 
     - name: Create NICs json for VLANs nics
       vars:
@@ -141,7 +178,7 @@
       loop: "{{ wanted_nodes | subelements('nics') }}"
       loop_control:
         label: "{{ item.0.name }} - {{ item.1.identifier }}"
-      when: item.1.ucs_name is undefined
+      when: item.0.name not in rhs_hosts and item.1.ucs_name is undefined
 
     - name: Write host post request to variable
       vars:
@@ -152,17 +189,17 @@
           location_id: "{{ rhs_location[ hash ] | int }}"
           organization_id: "{{ rhs_organization[ hash ] | int }}"
           environment_id: "{{ rhs_environment[ hash ] | int }}"
+          managed: 1
+          build: 1
           interfaces_attributes: "{{ lookup('vars', 'vnic' + hash) }}"
       uri:
         <<: *uri_rhs
         method: POST
         body_format: json
+        status_code:
+          - 200
+          - 201
         url: "{{ rhs.url }}/api/hosts"
         body: "{{ { 'host' : host } }}"
       <<: *loop_wanted_node
-
-#    - name: Create host in RHS
-#      uri:
-#        <<: *uri_rhs
-#        method: POST
-#      <<: *loop_wanted_node
+      when: item.name not in rhs_hosts
