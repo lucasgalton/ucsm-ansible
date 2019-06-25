@@ -16,11 +16,6 @@
       loop: "{{ wanted_nodes|flatten(levels=1) }}"
       loop_control:
         label: "{{ item.name }}"
-    rhs_hostgroup: {}
-    rhs_subnet: {}
-    rhs_location: {}
-    rhs_organization: {}
-    rhs_environment: {}
 
   tasks:
     - name: Create service profile from template
@@ -43,8 +38,10 @@
       <<: *loop_wanted_node
 
     - name: Save host groups IDs
+      vars:
+        hash: "{{ item.item.name | hash('md5') }}"
       set_fact:
-        rhs_hostgroup: "{{ rhs_hostgroup | combine({item.item.name : item.json.results[0].id}) }}"
+        rhs_hostgroup: "{{ rhs_hostgroup | default({}) | combine({ hash : item.json.results[0].id }) }}"
       loop: "{{ rhs_hostgroups_response.results|flatten(levels=1) }}"
       loop_control:
         label: "{{ item.item.name }}"
@@ -58,8 +55,10 @@
       <<: *loop_wanted_node
 
     - name: Save location id
+      vars:
+        hash: "{{ item.item.name | hash('md5') }}"
       set_fact:
-        rhs_location: "{{ rhs_location | combine({item.item.name : item.json.results[0].id}) }}"
+        rhs_location: "{{ rhs_location | default({}) | combine({ hash: item.json.results[0].id }) }}"
       loop: "{{ rhs_locations_response.results|flatten(levels=1) }}"
       loop_control:
         label: "{{ item.item.name }}"
@@ -73,8 +72,10 @@
       <<: *loop_wanted_node
 
     - name: Save organization id
+      vars:
+        hash: "{{ item.item.name | hash('md5') }}"
       set_fact:
-        rhs_organization: "{{ rhs_organization | combine({item.item.name : item.json.results[0].id}) }}"
+        rhs_organization: "{{ rhs_organization | default({}) | combine({ hash : item.json.results[0].id }) }}"
       loop: "{{ rhs_organizations_response.results|flatten(levels=1) }}"
       loop_control:
         label: "{{ item.item.name }}"
@@ -88,8 +89,10 @@
       <<: *loop_wanted_node
 
     - name: Save environment id
+      vars:
+        hash: "{{ item.item.name | hash('md5') }}"
       set_fact:
-        rhs_environment: "{{ rhs_environment | combine({item.item.name : item.json.results[0].id}) }}"
+        rhs_environment: "{{ rhs_environment | default({}) | combine({ hash : item.json.results[0].id }) }}"
       loop: "{{ rhs_environments_response.results|flatten(levels=1) }}"
       loop_control:
         label: "{{ item.item.name }}"
@@ -106,34 +109,57 @@
 
     - name: Save subnet id
       set_fact:
-        rhs_subnet: "{{ rhs_subnet | combine({item.json.results[0].name : item.json.results[0].id}) }}"
+        rhs_subnet: "{{ rhs_subnet | default({}) | combine({item.json.results[0].name : item.json.results[0].id}) }}"
       loop: "{{ rhs_subnets_response.results }}"
       loop_control:
         label: "{{ item.json.results[0].name }}"
 
-    - name: Create NICs json
+    - name: Create NICs json for non vlans NICs
       vars:
-        flat_json_var_name: "{{ item.0.name + '_' + item.1.identifier }}"
-        hash: "vnic{{ flat_json_var_name | hash('md5') }}"
+        hash: "vnic{{ item.0.name | hash('md5') }}"
+        identifier: "{{ { 'identifier' : item.1.identifier } }}"
         base_attributes: "{{ item.1.rhs_attributes | default({}) }}"
         subnet: "{{ {'subnet_id' : rhs_subnet[ item.1.rhs_subnet ]} }}"
-        mac: "{{ {'mac' : ucs_sp[ item.0.name ].vnics[item.1.ucs_name].addr } }}"
-        rhs_attributes: "{{ base_attributes | combine(subnet, mac) }}"
+        mac: "{{ { 'mac' : ucs_sp[ item.0.name ].vnics[item.1.ucs_name].addr } }}"
+        rhs_attributes: "{{ base_attributes | combine(identifier, subnet, mac) }}"
       set_fact:
-        "{{ hash }}": "{{ rhs_attributes }}"
+        "{{ hash }}": "{{ lookup('vars', hash, default=[]) + [ rhs_attributes ] }}"
       loop: "{{ wanted_nodes | subelements('nics') }}"
+      loop_control:
+        label: "{{ item.0.name }} - {{ item.1.identifier }}"
+      when: item.1.ucs_name is defined
 
-    - name: Debug
+    - name: Create NICs json for VLANs nics
       vars:
-        flat_json_var_name: "{{ item.0.name + '_' + item.1.identifier }}"
-        hash: "vnic{{ flat_json_var_name | hash('md5') }}"
-      debug:
-        var: "{{ hash }}"
+        hash: "vnic{{ item.0.name | hash('md5') }}"
+        identifier: "{{ { 'identifier' : item.1.identifier } }}"
+        base_attributes: "{{ item.1.rhs_attributes | default({}) }}"
+        subnet: "{{ {'subnet_id' : rhs_subnet[ item.1.rhs_subnet ]} }}"
+        rhs_attributes: "{{ base_attributes | combine(identifier, subnet) }}"
+      set_fact:
+        "{{ hash }}": "{{ lookup('vars', hash, default=[]) + [ rhs_attributes ] }}"
       loop: "{{ wanted_nodes | subelements('nics') }}"
+      loop_control:
+        label: "{{ item.0.name }} - {{ item.1.identifier }}"
+      when: item.1.ucs_name is undefined
 
-    - name: Debug
-      debug:
-        var: ucs_sp['ceph-osd-1'].vnics['TOOLS_PROV_PRIV']
+    - name: Write host post request to variable
+      vars:
+        hash: "{{ item.name | hash('md5') }}"
+        host:
+          name: "{{ item.name }}"
+          hostgroup_id: "{{ rhs_hostgroup[ hash ] | int }}"
+          location_id: "{{ rhs_location[ hash ] | int }}"
+          organization_id: "{{ rhs_organization[ hash ] | int }}"
+          environment_id: "{{ rhs_environment[ hash ] | int }}"
+          interfaces_attributes: "{{ lookup('vars', 'vnic' + hash) }}"
+      uri:
+        <<: *uri_rhs
+        method: POST
+        body_format: json
+        url: "{{ rhs.url }}/api/hosts"
+        body: "{{ { 'host' : host } }}"
+      <<: *loop_wanted_node
 
 #    - name: Create host in RHS
 #      uri:
