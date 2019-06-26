@@ -16,6 +16,8 @@
       loop: "{{ wanted_nodes|flatten(levels=1) }}"
       loop_control:
         label: "{{ item.name }}"
+    rhs_hosts: []
+    rhs_hosts_ids: []
 
   tasks:
     - name: Get existing RHS hosts
@@ -31,8 +33,19 @@
         hash: "{{ item.item.name | hash('md5') }}"
       set_fact:
         rhs_hosts: "{{ ( rhs_hosts | default([]) ) + [ item.item.name ] }}"
+        rhs_hosts_ids: "{{ ( rhs_hosts_ids | default([]) ) + [ item.json.results[0].id ] }}"
       loop: "{{ rhs_hosts_response.results }}"
       when: item.json.results | length == 1
+
+    - name: Delete Hosts from RHS
+      uri:
+        <<: *uri_rhs
+        method: DELETE
+        url: "{{ rhs.url }}/api/hosts/{{ item | urlencode() }}"
+      loop: "{{ rhs_hosts_ids }}"
+      when: destructive_mode
+
+    #TODO: Check if profile exist in ucs. If it's the case, stop
 
     - name: Create service profile from template
       ucs_service_profile_from_template:
@@ -63,7 +76,7 @@
       loop: "{{ rhs_hostgroups_response.results|flatten(levels=1) }}"
       loop_control:
         label: "{{ item.item.name }}"
-      when: rhs_hostgroups_response.results | length > 0
+      when: item.json
 
     - name: Get location ID
       uri:
@@ -82,7 +95,7 @@
       loop: "{{ rhs_locations_response.results|flatten(levels=1) }}"
       loop_control:
         label: "{{ item.item.name }}"
-      when: rhs_locations_ is defined
+      when: item.json
 
     - name: Get organization ID
       uri:
@@ -101,6 +114,7 @@
       loop: "{{ rhs_organizations_response.results|flatten(levels=1) }}"
       loop_control:
         label: "{{ item.item.name }}"
+      when: item.json
 
     - name: Get environment ID
       uri:
@@ -119,6 +133,7 @@
       loop: "{{ rhs_environments_response.results|flatten(levels=1) }}"
       loop_control:
         label: "{{ item.item.name }}"
+      when: item.json
 
     - name: Get subnet IDs
       uri:

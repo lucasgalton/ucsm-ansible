@@ -6,6 +6,153 @@ rhs:
 destructive_mode: true
 
 wanted_nodes:
+  - name: ceph-osd-1
+    nics:
+      - identifier: enp98s0f0
+        ucs_name: TOOLS_PROV_PRIV
+        rhs_subnet: provisioning
+        rhs_attributes:
+          provision: true
+      - identifier: enp103s0f1
+        ucs_name: CEPH_INFRA
+      - identifier: enp103s0f1.109
+        rhs_subnet: tools2
+        rhs_attributes:
+          primary: true
+          ip: 10.64.152.139
+          virtual: true
+          tag: 109
+          attached_to: enp103s0f1
+      - identifier: enp103s0f1.110
+        rhs_subnet: CEPH_EXT_POD1_MGT
+        rhs_attributes:
+          ip: 10.64.152.34
+          virtual: true
+          tag: 110
+          attached_to: enp103s0f1
+      - identifier: enp98s0f1
+        ucs_name: CEPH_MGMT
+      - identifier: enp98s0f1.158
+        rhs_subnet: CEPH_MGMT
+        rhs_attributes:
+          ip: 100.70.1.90
+          virtual: true
+          tag: 158
+          attached_to: enp98s0f1
+      - identifier: enp103s0f0
+        ucs_name: CEPH_DATA
+      - identifier: enp103s0f0.157
+        rhs_subnet: CEPH_DATA
+        rhs_attributes:
+          ip: 100.70.1.139
+          virtual: true
+          tag: 157
+          attached_to: enp103s0f0
+    hostgroup: ceph
+    location: Default Location
+    organization: Enedis
+    environment: production
+    domain: admtmp.zs2.enedis.fr
+    ucs_org: root
+
+  - name: ceph-osd-2
+    nics:
+      - identifier: enp98s0f0
+        ucs_name: TOOLS_PROV_PRIV
+        rhs_subnet: provisioning
+        rhs_attributes:
+          provision: true
+      - identifier: enp103s0f1
+        ucs_name: CEPH_INFRA
+      - identifier: enp103s0f1.109
+        rhs_subnet: tools2
+        rhs_attributes:
+          primary: true
+          ip: 10.64.152.140
+          virtual: true
+          tag: 109
+          attached_to: enp103s0f1
+      - identifier: enp103s0f1.110
+        rhs_subnet: CEPH_EXT_POD1_MGT
+        rhs_attributes:
+          ip: 10.64.152.35
+          virtual: true
+          tag: 110
+          attached_to: enp103s0f1
+      - identifier: enp98s0f1
+        ucs_name: CEPH_MGMT
+      - identifier: enp98s0f1.158
+        rhs_subnet: CEPH_MGMT
+        rhs_attributes:
+          ip: 100.70.1.91
+          virtual: true
+          tag: 158
+          attached_to: enp98s0f1
+      - identifier: enp103s0f0
+        ucs_name: CEPH_DATA
+      - identifier: enp103s0f0.157
+        rhs_subnet: CEPH_DATA
+        rhs_attributes:
+          ip: 100.70.1.140
+          virtual: true
+          tag: 157
+          attached_to: enp103s0f0
+    hostgroup: ceph
+    location: Default Location
+    organization: Enedis
+    environment: production
+    domain: admtmp.zs2.enedis.fr
+    ucs_org: root
+
+  - name: ceph-osd-3
+    nics:
+      - identifier: enp98s0f0
+        ucs_name: TOOLS_PROV_PRIV
+        rhs_subnet: provisioning
+        rhs_attributes:
+          provision: true
+      - identifier: enp103s0f1
+        ucs_name: CEPH_INFRA
+      - identifier: enp103s0f1.109
+        rhs_subnet: tools2
+        rhs_attributes:
+          primary: true
+          ip: 10.64.152.141
+          virtual: true
+          tag: 109
+          attached_to: enp103s0f1
+      - identifier: enp103s0f1.110
+        rhs_subnet: CEPH_EXT_POD1_MGT
+        rhs_attributes:
+          ip: 10.64.152.36
+          virtual: true
+          tag: 110
+          attached_to: enp103s0f1
+      - identifier: enp98s0f1
+        ucs_name: CEPH_MGMT
+      - identifier: enp98s0f1.158
+        rhs_subnet: CEPH_MGMT
+        rhs_attributes:
+          ip: 100.70.1.92
+          virtual: true
+          tag: 158
+          attached_to: enp98s0f1
+      - identifier: enp103s0f0
+        ucs_name: CEPH_DATA
+      - identifier: enp103s0f0.157
+        rhs_subnet: CEPH_DATA
+        rhs_attributes:
+          ip: 100.70.1.141
+          virtual: true
+          tag: 157
+          attached_to: enp103s0f0
+    hostgroup: ceph
+    location: Default Location
+    organization: Enedis
+    environment: production
+    domain: admtmp.zs2.enedis.fr
+    ucs_org: root
+
   - name: ceph-osd-4
     nics:
       - identifier: enp98s0f0
@@ -53,4 +200,6 @@ wanted_nodes:
     organization: Enedis
     environment: production
     domain: admtmp.zs2.enedis.fr
+    ucs_org: root
+
 
